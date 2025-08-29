@@ -20,7 +20,7 @@
     "llm",
     "automation"
   ],
-  "author": "Your Name",
+  "author": "Shubham Sharma",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2",
