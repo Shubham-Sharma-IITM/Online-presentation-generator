@@ -6,14 +6,16 @@ import { TemplateStyle } from '../types';
 
 export class TemplateService {
   async extractTemplateStyle(templatePath: string): Promise<TemplateStyle> {
-    const zip = new StreamZip.async({ file: templatePath });
+    let zip: any;
     
     try {
-      const colors = await this.extractDetailedColors(zip);
-      const fonts = await this.extractDetailedFonts(zip);
-      const masterSlides = await this.extractMasterSlides(zip);
+      zip = new StreamZip.async({ file: templatePath });
+      
+      const colors = await this.extractColors(zip);
+      const fonts = await this.extractFonts(zip);
       const layouts = await this.extractLayouts(zip);
-      const images = await this.extractImages(zip, templatePath);
+      const images = await this.extractImages(zip);
+      const masterSlides = await this.extractMasterSlides(zip);
 
       return {
         colors,
@@ -22,18 +24,27 @@ export class TemplateService {
         images,
         masterSlides
       };
+    } catch (error) {
+      console.warn('Error extracting template style:', error);
+      return this.getDefaultTemplateStyle();
     } finally {
-      await zip.close();
+      if (zip) {
+        try {
+          await zip.close();
+        } catch (e) {
+          // Ignore close errors
+        }
+      }
     }
   }
 
-  private async extractDetailedColors(zip: StreamZip.AsyncZipFile): Promise<any> {
+  private async extractColors(zip: any): Promise<any> {
     try {
       const themeData = await zip.entryData('ppt/theme/theme1.xml');
       const themeXml = themeData.toString('utf8');
       const parsedTheme = await parseStringPromise(themeXml);
       
-      const colors = {
+      const defaultColors = {
         primary: '#1f4e79',
         secondary: '#70ad47',
         accent1: '#4472c4',
@@ -47,34 +58,36 @@ export class TemplateService {
         scheme: 'default'
       };
 
-      // Extract color scheme
+      // Try to extract colors, fallback to defaults
       const colorScheme = parsedTheme?.['a:theme']?.['a:themeElements']?.[0]?.['a:clrScheme']?.[0];
       
       if (colorScheme) {
-        // Extract theme colors
         const extractColor = (colorType: string): string => {
-          const colorElement = colorScheme[`a:${colorType}`]?.[0];
-          if (colorElement?.['a:srgbClr']?.[0]?.$?.val) {
-            return '#' + colorElement['a:srgbClr'][0].$.val;
+          try {
+            const colorElement = colorScheme[`a:${colorType}`]?.[0];
+            if (colorElement?.['a:srgbClr']?.[0]?.$?.val) {
+              return '#' + colorElement['a:srgbClr'][0].$.val;
+            }
+          } catch (e) {
+            // Ignore extraction errors
           }
-          return colors.primary; // fallback
+          return defaultColors.primary;
         };
 
-        colors.primary = extractColor('dk1') || extractColor('accent1');
-        colors.secondary = extractColor('accent2');
-        colors.accent1 = extractColor('accent1');
-        colors.accent2 = extractColor('accent2');
-        colors.accent3 = extractColor('accent3');
-        colors.accent4 = extractColor('accent4');
-        colors.accent5 = extractColor('accent5');
-        colors.accent6 = extractColor('accent6');
-        colors.background = extractColor('lt1');
-        colors.text = extractColor('dk1');
+        return {
+          ...defaultColors,
+          primary: extractColor('dk1') || extractColor('accent1'),
+          secondary: extractColor('accent2'),
+          accent1: extractColor('accent1'),
+          accent2: extractColor('accent2'),
+          background: extractColor('lt1'),
+          text: extractColor('dk1')
+        };
       }
 
-      return colors;
+      return defaultColors;
     } catch (error) {
-      console.warn('Could not extract detailed colors from template, using defaults');
+      console.warn('Could not extract colors, using defaults');
       return {
         primary: '#1f4e79',
         secondary: '#70ad47',
@@ -85,13 +98,13 @@ export class TemplateService {
     }
   }
 
-  private async extractDetailedFonts(zip: StreamZip.AsyncZipFile): Promise<any> {
+  private async extractFonts(zip: any): Promise<any> {
     try {
       const themeData = await zip.entryData('ppt/theme/theme1.xml');
       const themeXml = themeData.toString('utf8');
       const parsedTheme = await parseStringPromise(themeXml);
       
-      const fonts = {
+      const defaultFonts = {
         title: 'Calibri',
         body: 'Calibri',
         heading: 'Calibri',
@@ -106,18 +119,17 @@ export class TemplateService {
         const majorFont = fontScheme['a:majorFont']?.[0]?.['a:latin']?.[0]?.$?.typeface;
         const minorFont = fontScheme['a:minorFont']?.[0]?.['a:latin']?.[0]?.$?.typeface;
         
-        if (majorFont) {
-          fonts.title = majorFont;
-          fonts.heading = majorFont;
-        }
-        if (minorFont) {
-          fonts.body = minorFont;
-        }
+        return {
+          ...defaultFonts,
+          title: majorFont || defaultFonts.title,
+          heading: majorFont || defaultFonts.heading,
+          body: minorFont || defaultFonts.body
+        };
       }
 
-      return fonts;
+      return defaultFonts;
     } catch (error) {
-      console.warn('Could not extract detailed fonts from template, using defaults');
+      console.warn('Could not extract fonts, using defaults');
       return {
         title: 'Calibri',
         body: 'Calibri',
@@ -129,7 +141,7 @@ export class TemplateService {
     }
   }
 
-  private async extractMasterSlides(zip: StreamZip.AsyncZipFile): Promise<any[]> {
+  private async extractMasterSlides(zip: any): Promise<any[]> {
     const masterSlides: any[] = [];
     
     try {
@@ -140,11 +152,9 @@ export class TemplateService {
           try {
             const masterData = await zip.entryData(entryName);
             const masterXml = masterData.toString('utf8');
-            const parsedMaster = await parseStringPromise(masterXml);
-            
             masterSlides.push({
               name: entryName,
-              content: parsedMaster
+              content: masterXml
             });
           } catch (err) {
             console.warn(`Could not parse master slide ${entryName}`);
@@ -158,7 +168,7 @@ export class TemplateService {
     return masterSlides;
   }
 
-  private async extractLayouts(zip: StreamZip.AsyncZipFile): Promise<any[]> {
+  private async extractLayouts(zip: any): Promise<any[]> {
     const layouts: any[] = [];
     
     try {
@@ -168,12 +178,9 @@ export class TemplateService {
         if (entryName.startsWith('ppt/slideLayouts/slideLayout') && entryName.endsWith('.xml')) {
           try {
             const layoutData = await zip.entryData(entryName);
-            const layoutXml = layoutData.toString('utf8');
-            const parsedLayout = await parseStringPromise(layoutXml);
-            
             layouts.push({
               name: entryName,
-              content: parsedLayout
+              content: layoutData.toString('utf8')
             });
           } catch (err) {
             console.warn(`Could not parse layout ${entryName}`);
@@ -187,14 +194,14 @@ export class TemplateService {
     return layouts;
   }
 
-  private async extractImages(zip: StreamZip.AsyncZipFile, templatePath: string): Promise<string[]> {
+  private async extractImages(zip: any): Promise<string[]> {
     const images: string[] = [];
     
     try {
       const entries = await zip.entries();
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.svg'];
       
-      for (const [entryName, entry] of Object.entries(entries)) {
+      for (const entryName of Object.keys(entries)) {
         if (imageExtensions.some(ext => entryName.toLowerCase().endsWith(ext))) {
           images.push(entryName);
         }
@@ -204,5 +211,28 @@ export class TemplateService {
     }
 
     return images;
+  }
+
+  private getDefaultTemplateStyle(): TemplateStyle {
+    return {
+      colors: {
+        primary: '#1f4e79',
+        secondary: '#70ad47',
+        accent1: '#4472c4',
+        background: '#ffffff',
+        text: '#000000'
+      },
+      fonts: {
+        title: 'Calibri',
+        body: 'Calibri',
+        heading: 'Calibri',
+        titleSize: 44,
+        bodySize: 18,
+        headingSize: 24
+      },
+      layouts: [],
+      images: [],
+      masterSlides: []
+    };
   }
 }
