@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json.*
+
+# Build outputs
+dist/
+build/
+.cache/
+.next/
+out/
+
+# Client build (Vite/React)
+client/dist/
+client/node_modules/
+
+# Server build
+server/dist/
+server/node_modules/
+
+# Logs
+logs
+*.log
+*.log.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
