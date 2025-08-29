@@ -1,9 +1,8 @@
 [build]
 builder = "NIXPACKS"
-# Install root, client, and server deps before building
 buildCommand = """
 npm install
-cd client && npm install && cd ..
-cd server && npm install && cd ..
+( cd client && npm install )
+( cd server && npm install )
 npm run build
 """
