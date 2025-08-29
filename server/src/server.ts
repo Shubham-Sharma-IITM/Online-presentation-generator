@@ -6,7 +6,7 @@ import fs from 'fs-extra';
 import { generatePresentationController } from './controllers/presentationController';
 
 const app = express();
-const PORT = process.env.PORT || 8080; // Use 8080 as you set
+const PORT = parseInt(process.env.PORT || '8080', 10); // This fixes it
 
 // Environment-based configuration
 const isDevelopment = process.env.NODE_ENV !== 'production';
