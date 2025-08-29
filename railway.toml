@@ -1,3 +1,9 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build"
+# Install root, client, and server deps before building
+buildCommand = """
+npm install
+cd client && npm install && cd ..
+cd server && npm install && cd ..
+npm run build
+"""
